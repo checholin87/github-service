@@ -2,31 +2,37 @@ package me.cosme.retrofit.githubservice.config;
 
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
-import javax.interceptor.InvocationContext;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import com.netflix.hystrix.HystrixCommandKey;
+import java.lang.reflect.Method;
 
 public class HistrixCommand extends HystrixCommand<Object> {
 
-    private final InvocationContext ctx;
+    final Object proxy;
+    final Method method;
+    final Object[] args;
 
-    public HistrixCommand(InvocationContext ctx) {
-        super(HystrixCommandGroupKey.Factory.asKey(
-            String.format("%s#%s",
-                ctx.getMethod().getDeclaringClass().getName(),
-                ctx.getMethod().getName())));
-        checkNotNull(ctx);
-        this.ctx = ctx;
+    public HistrixCommand(Object proxy, Method method, Object[] args) {
+        // TODO set a group based on proxy interfaces
+        super(Setter.withGroupKey(
+            HystrixCommandGroupKey.Factory.asKey(
+                String.format("%s#%s",
+                    "proxy-command",
+                    "proxy-method")))
+            .andCommandKey(
+                HystrixCommandKey.Factory.asKey("proxy-command-key")));
+        this.proxy = proxy;
+        this.method = method;
+        this.args = args;
     }
 
     @Override
     protected Object run() throws Exception {
-        return ctx.proceed();
+        return method.invoke(proxy, args);
     }
 
     @Override
     protected Object getFallback() {
-        throw new RuntimeException(String.format("service %s is unavailable", 
+        throw new RuntimeException(String.format("service %s is unavailable",
             this.getCommandGroup().name()));
     }
 }
